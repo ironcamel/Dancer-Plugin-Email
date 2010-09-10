@@ -1,7 +1,23 @@
 
 Dancer-Plugin-Email - Simple email handling for Dancer applications using Email::Stuff!
 
-INSTALLATION
+BASIC USAGES
+
+  use Dancer;
+  use Dancer::Plugin::Email;
+  
+  post '/contact' => sub {
+  
+      email {
+          to => '...',
+          subject => '...',
+          message => $msg,
+          attachment => [
+              '/path/to/file' => 'filename'
+          ]
+      };
+
+  };
 
 To install this module using code from CPAN,
 run the following commands

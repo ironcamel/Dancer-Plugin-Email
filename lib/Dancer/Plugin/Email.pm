@@ -6,6 +6,8 @@ use Dancer::Plugin;
 use Hash::Merge;
 use base 'Email::Stuff';
 
+use Data::Dumper qw/Dumper/;
+
 my $settings = plugin_setting;
 
 register email => sub {
@@ -69,7 +71,25 @@ register email => sub {
                 $Email::Send::Sendmail::SENDMAIL;
         }
         if (lc($settings->{driver}) eq lc("smtp")) {
-            $self->{send_using} = ['SMTP', $settings->{host}];
+            if ($settings->{host} && $settings->{user} && $settings->{pass}) {
+                
+                my   @parameters = ();
+                push @parameters, 'Host' => $settings->{host} if $settings->{host};
+                push @parameters, 'Port'  => $settings->{port} if $settings->{port};
+                
+                push @parameters, 'username' => $settings->{user} if $settings->{user};
+                push @parameters, 'password' => $settings->{pass} if $settings->{pass};
+                push @parameters, 'ssl'      => $settings->{ssl} if $settings->{ssl};
+                
+                push @parameters, 'Proto' => 'tcp';
+                push @parameters, 'Reuse' => 1;
+                push @parameters, 'Debug' => 1;
+                
+                $self->{send_using} = ['SMTP', @parameters];
+            }
+            else {
+                $self->{send_using} = ['SMTP', Host => $settings->{host}];
+            }
         }
         if (lc($settings->{driver}) eq lc("qmail")) {
             $self->{send_using} = ['Qmail', $settings->{path}];
@@ -81,12 +101,13 @@ register email => sub {
             $self->{send_using} = ['NNTP', $settings->{host}];
         }
         my $email = $self->email or return undef;
-        $self->mailer->send( $email );
+        # die Dumper $email->as_string;
+        return $self->mailer->send( $email );
     }
     else {
         $self->using(@arguments) if @arguments; # Arguments passed to ->using
         my $email = $self->email or return undef;
-        $self->mailer->send( $email );
+        return $self->mailer->send( $email );
     }
 };
 
@@ -109,6 +130,25 @@ register email => sub {
 Important Note! The default email format is html, this can be changed to text by
 seeting the option 'type' to 'text' in the config file or as a key/value in the
 hashref passed to the email keyword.
+
+=head1 USAGES
+
+    # Handle Email Failures
+    
+    post '/contact' => sub {
+    
+        my $msg = email {
+            to => '...',
+            subject => '...',
+            message => $msg,
+            attachment => [
+                '/path/to/file' => 'filename'
+            ]
+        };
+        
+        warn $msg->{string} if $msg->{type} eq 'failure';
+        
+    };
 
 =head1 CONFIGURATION
 
