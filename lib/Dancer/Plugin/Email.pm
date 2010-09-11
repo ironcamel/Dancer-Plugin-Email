@@ -141,7 +141,7 @@ register email => sub {
     };
     
 Important Note! The default email format is plain-text, this can be changed to
-html by seeting the option 'type' to 'heml' in the config file or as an argument
+html by seeting the option 'type' to 'html' in the config file or as an argument
 in the hashref passed to the email keyword. The following are options that can
 be passed to the email function:
 
