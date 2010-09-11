@@ -6,7 +6,7 @@ use Dancer::Plugin;
 use Hash::Merge;
 use base 'Email::Stuff';
 
-use Data::Dumper qw/Dumper/;
+# use Data::Dumper qw/Dumper/;
 
 my $settings = plugin_setting;
 
@@ -38,6 +38,11 @@ register email => sub {
         join ",", ( map { $_ =~ s/(^\s+|\s+$)//g; $_ } split /[\,\s]/, $options->{bcc} ) );
     }
     
+    # process reply_to
+    if ($options->{reply_to}) {
+        $self->header("Return-Path" => $options->{reply_to});
+    }
+    
     # process subject
     if ($options->{subject}) {
         $self->subject($options->{subject});
@@ -45,18 +50,25 @@ register email => sub {
     
     # process message
     if ($options->{message}) {
-        if (lc($options->{type}) eq 'text') {
-            $self->text_body($options->{message});
+        if (lc($options->{type}) eq 'html') {
+            $self->html_body($options->{message});
         }
         else {
-            $self->html_body($options->{message});
+            $self->text_body($options->{message});
+        }
+    }
+    
+    # process additional headers
+    if ($options->{headers} && ref($options->{headers}) eq "HASH") {
+        foreach my $header (keys %{ $options->{headers} }) {
+            $self->header( $header => $options->{headers}->{$header} );
         }
     }
     
     # process attachments
-    if ($options->{attachments}) {
-        if (ref($options->{attachments}) eq "ARRAY") {
-            my %files = @{$options->{attachments}};
+    if ($options->{attach}) {
+        if (ref($options->{attach}) eq "ARRAY") {
+            my %files = @{$options->{attach}};
             foreach my $file (keys %files) {
                 $self->attach($file, 'filename' => $files{$file});
             }
@@ -83,7 +95,8 @@ register email => sub {
                 
                 push @parameters, 'Proto' => 'tcp';
                 push @parameters, 'Reuse' => 1;
-                push @parameters, 'Debug' => 1;
+                
+                push @parameters, 'Debug' => 1 if $settings->{debug};
                 
                 $self->{send_using} = ['SMTP', @parameters];
             }
@@ -121,17 +134,57 @@ register email => sub {
             to => '...',
             subject => '...',
             message => $msg,
-            attachment => [
+            attach => [
                 '/path/to/file' => 'filename'
             ]
         };
     };
     
-Important Note! The default email format is html, this can be changed to text by
-seeting the option 'type' to 'text' in the config file or as a key/value in the
-hashref passed to the email keyword.
+Important Note! The default email format is plain-text, this can be changed to
+html by seeting the option 'type' to 'heml' in the config file or as an argument
+in the hashref passed to the email keyword. The following are options that can
+be passed to the email function:
 
-=head1 USAGES
+    # send message to
+    to => $email_recipient
+    
+    # send messages from
+    from => $mail_sender
+    
+    # email subject
+    subject => 'email subject line'
+    
+    # message body
+    message => 'html or plain-text data'
+    
+    # email message content type
+    type => 'text'
+    type => 'html'
+    
+    # carbon-copy other email addresses
+    cc => 'user@site.com'
+    cc => 'user_a@site.com, user_b@site.com, user_c@site.com'
+    cc => join ', ', @email_addresses
+    
+    # blind carbon-copy other email addresses
+    bcc => 'user@site.com'
+    bcc => 'user_a@site.com, user_b@site.com, user_c@site.com'
+    bcc => join ', ', @email_addresses
+    
+    # specify where email responses should be directed
+    reply_to => 'other_email@website.com'
+    
+    # attach files to the email
+    attach => [
+        $file_location => $attachment_name,
+    ]
+    
+    # send additional (specialized) headers
+    headers => {
+        "X-Mailer" => "Dancer::Plugin::Email 1.23456789"
+    }
+
+=head1 CODE COOKBOOK
 
     # Handle Email Failures
     
@@ -141,7 +194,7 @@ hashref passed to the email keyword.
             to => '...',
             subject => '...',
             message => $msg,
-            attachment => [
+            attach => [
                 '/path/to/file' => 'filename'
             ]
         };
@@ -149,6 +202,68 @@ hashref passed to the email keyword.
         warn $msg->{string} if $msg->{type} eq 'failure';
         
     };
+    
+    # Add More Email Headers
+    
+    email {
+        to => '...',
+        subject => '...',
+        message => $msg,
+        headers => {
+            "X-Mailer" => 'This fine Dancer application',
+            "X-Accept-Language" => 'en'
+        }
+    };
+    
+
+=head1 CONFIG COOKBOOK
+
+    # Send mail via SMTP with SASL authentication
+    
+    plugins:
+      Email:
+        driver: smtp
+        host: smtp.website.com
+        user: account@gmail.com
+        pass: ****
+    
+    # Send mail to/from google (gmail)
+    
+    plugins:
+      Email:
+        ssl: 1
+        driver: smtp
+        host: smtp.gmail.com
+        port: 465
+        user: account@gmail.com
+        pass: ****
+        
+    # Send mail to/from google (gmail) using TLS
+    
+    plugins:
+      Email:
+        tls: 1
+        driver: smtp
+        host: smtp.gmail.com
+        port: 587
+        user: account@gmail.com
+        pass: ****
+        
+    # Debug email server communications
+    
+    plugins:
+      Email:
+        debug: 1
+        
+    # Set default headers to be issued with every message
+    
+    plugins:
+      Email:
+        from: ...
+        subject: ...
+        headers:
+          X-Mailer: MyDancer 1.0
+          X-Accept-Language: en
 
 =head1 CONFIGURATION
 

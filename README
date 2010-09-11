@@ -12,7 +12,7 @@ BASIC USAGES
           to => '...',
           subject => '...',
           message => $msg,
-          attachment => [
+          attach => [
               '/path/to/file' => 'filename'
           ]
       };
