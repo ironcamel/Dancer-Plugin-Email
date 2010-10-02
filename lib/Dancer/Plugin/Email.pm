@@ -123,7 +123,7 @@ register email => sub {
         }
         if (lc($settings->{driver}) eq lc("qmail")) {
             $self->{send_using} = ['Qmail', $settings->{path}];
-            # failsafe
+            # fail safe
             $Email::Send::Qmail::QMAIL = $settings->{path} unless
                 $Email::Send::Qmail::QMAIL;
         }
@@ -158,7 +158,7 @@ register email => sub {
     };
     
 Important Note! The default email format is plain-text, this can be changed to
-html by seeting the option 'type' to 'html' in the config file or as an argument
+html by setting the option 'type' to 'html' in the config file or as an argument
 in the hashref passed to the email keyword. The following are options that can
 be passed to the email function:
 
@@ -262,7 +262,7 @@ be passed to the email function:
         user: account@gmail.com
         pass: ****
     
-    # Send mail to/from google (gmail)
+    # Send mail to/from Google (gmail)
     
     plugins:
       Email:
@@ -273,7 +273,7 @@ be passed to the email function:
         user: account@gmail.com
         pass: ****
         
-    # Send mail to/from google (gmail) using TLS
+    # Send mail to/from Google (gmail) using TLS
     
     plugins:
       Email:
@@ -316,7 +316,7 @@ should be specified as, for example:
 
 Provides an easy way of handling text or html email messages with or without
 attachments. Simply define how you wish to send the email in your application's
-YAML configuration file, then call the email keyword passing the neccessary
+YAML configuration file, then call the email keyword passing the necessary
 parameters as outlined above.
 
 =cut
