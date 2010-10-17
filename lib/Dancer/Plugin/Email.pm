@@ -14,7 +14,8 @@ register email => sub {
     my ($options, @arguments)  = @_;
     my $self = Email::Stuff->new;
     
-    $options = Hash::Merge->new( 'LEFT_PRECEDENT' )->merge($settings, $options);
+    #$options = Hash::Merge->new( 'LEFT_PRECEDENT' )->merge($settings, $options);
+    $options = Hash::Merge->new( 'LEFT_PRECEDENT' )->merge($options, $settings); # requested by igor.bujna@post.cz
     
     # process to
     if ($options->{to}) {
