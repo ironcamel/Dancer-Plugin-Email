@@ -40,9 +40,7 @@ register email => sub {
     }
     
     # process reply_to
-    if ($options->{reply_to}) {
-        $self->header("Return-Path" => $options->{reply_to});
-    }
+    $self->header("Reply-To" => $options->{reply_to}) if $options->{reply_to};
     
     # process subject
     if ($options->{subject}) {
@@ -50,22 +48,21 @@ register email => sub {
     }
     
     # process message
-    if ($options->{message}) {
+    my $message = $options->{message};
+    my $type = $options->{type} || '';
+    if ($message) {
         # multipart send using plain text and html
-        if (lc($options->{type}) eq 'multi') {
-            if (ref($options->{message}) eq "HASH") {
-                $self->html_body($options->{message}->{html})
-                    if defined $options->{message}->{html};
-                $self->text_body($options->{message}->{text})
-                    if defined $options->{message}->{text};
-            }
+        if ($type eq 'multi') {
+            die 'message param must be a hashref if type is multi'
+                unless ref $message eq 'HASH';
+            $self->html_body($message->{html}) if defined $message->{html};
+            $self->text_body($message->{text}) if defined $message->{text};
         }
         else {
             # standard send using html or plain text
-            if (lc($options->{type}) eq 'html') {
+            if ($type eq 'html') {
                 $self->html_body($options->{message});
-            }
-            else {
+            } else {
                 $self->text_body($options->{message});
             }
         }
@@ -88,10 +85,6 @@ register email => sub {
         }
     }
 
-    # some light error handling
-    die 'specify type multi if sending text and html'
-        if lc($options->{type}) eq 'multi' && "HASH" eq ref $options->{type};
-        
     # okay, go team, go
     if (defined $settings->{driver}) {
         if (lc($settings->{driver}) eq lc("sendmail")) {
