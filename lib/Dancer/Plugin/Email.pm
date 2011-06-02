@@ -6,16 +6,13 @@ use Dancer::Plugin;
 use Hash::Merge;
 use base 'Email::Stuff';
 
-# use Data::Dumper qw/Dumper/;
-
 my $settings = plugin_setting;
 
 register email => sub {
     my ($options, @arguments)  = @_;
     my $self = Email::Stuff->new;
     
-    #$options = Hash::Merge->new( 'LEFT_PRECEDENT' )->merge($settings, $options);
-    $options = Hash::Merge->new( 'LEFT_PRECEDENT' )->merge($options, $settings); # requested by igor.bujna@post.cz
+    $options = Hash::Merge->new( 'LEFT_PRECEDENT' )->merge($options, $settings);
     
     # process to
     if ($options->{to}) {
@@ -76,13 +73,9 @@ register email => sub {
     }
     
     # process attachments
-    if ($options->{attach}) {
-        if (ref($options->{attach}) eq "ARRAY") {
-            my %files = @{$options->{attach}};
-            foreach my $file (keys %files) {
-                $self->attach($file, 'filename' => $files{$file});
-            }
-        }
+    my $files = $options->{attach};
+    if (ref $files eq 'ARRAY') {
+        map $self->attach_file($_), @$files;
     }
 
     # okay, go team, go
@@ -125,7 +118,6 @@ register email => sub {
             $self->{send_using} = ['NNTP', $settings->{host}];
         }
         my $email = $self->email or return undef;
-        # die Dumper $email->as_string;
         return $self->mailer->send( $email );
     }
     else {
@@ -145,9 +137,7 @@ register email => sub {
             to => '...',
             subject => '...',
             message => $msg,
-            attach => [
-                '/path/to/file' => 'filename'
-            ]
+            attach => [ '/path/to/file' ]
         };
     };
     
@@ -192,9 +182,7 @@ be passed to the email function:
     reply_to => 'other_email@website.com'
     
     # attach files to the email
-    attach => [
-        $file_location => $attachment_name,
-    ]
+    attach => [ '/path/to/file1', '/path/to/file2' ]
     
     # send additional (specialized) headers
     headers => {
@@ -211,9 +199,7 @@ be passed to the email function:
             to => '...',
             subject => '...',
             message => $msg,
-            attach => [
-                '/path/to/file' => 'filename'
-            ]
+            attach => [ '/path/to/file' ]
         };
         
         warn $msg->{string} if $msg->{type} eq 'failure';
