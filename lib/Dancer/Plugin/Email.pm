@@ -204,6 +204,7 @@ be passed to the email function:
             to => '...',
             subject => '...',
             message => $msg,
+            encoding => 'base64',
             attach => [ '/path/to/file' ]
         };
         
@@ -281,6 +282,7 @@ be passed to the email function:
       Email:
         from: ...
         subject: ...
+        encoding: base64
         headers:
           X-Mailer: MyDancer 1.0
           X-Accept-Language: en
