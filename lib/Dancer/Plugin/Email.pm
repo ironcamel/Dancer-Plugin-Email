@@ -208,7 +208,7 @@ be passed to the email function:
             attach => [ '/path/to/file' ]
         };
         
-        warn $msg->{string} if $msg->{type} eq 'failure';
+        warn $msg->string() if $msg->type() eq 'failure';
         
     };
     
