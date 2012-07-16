@@ -1,136 +1,45 @@
 package Dancer::Plugin::Email;
-# ABSTRACT: Simple email handling for Dancer applications using Email::Stuff!
 
 use Dancer ':syntax';
 use Dancer::Plugin;
-use Hash::Merge;
-use base 'Email::Stuff';
-
-my $settings = plugin_setting;
+use Email::Simple;
+use Email::Sender::Simple 'sendmail';
+use Module::Load 'load';
+use Scalar::Util 'blessed';
+use Try::Tiny;
 
 register email => sub {
-    my ($options, @arguments)  = @_;
-    my $self = Email::Stuff->new;
-    
-    $options = Hash::Merge->new( 'LEFT_PRECEDENT' )->merge($options, $settings);
-    
-    # process to
-    if ($options->{to}) {
-        $self->to($options->{to});
-    }
-    
-    # process from
-    if ($options->{from}) {
-        $self->from($options->{from});
-    }
-    
-    # process cc
-    if ($options->{cc}) {
-        $self->cc(
-        join ",", ( map { $_ =~ s/(^\s+|\s+$)//g; $_ } split /[\,\s]/, $options->{cc} ) );
-    }
-    
-    # process bcc
-    if ($options->{bcc}) {
-        $self->bcc(
-        join ",", ( map { $_ =~ s/(^\s+|\s+$)//g; $_ } split /[\,\s]/, $options->{bcc} ) );
-    }
-    
-    # process reply_to
-    $self->header("Reply-To" => $options->{reply_to}) if $options->{reply_to};
-    
-    # process subject
-    if ($options->{subject}) {
-        $self->subject($options->{subject});
-    }
-    
-    # process encoding
-    $options->{encoding} ||= 'quoted-printable';
-     
-    # process message
-    my $message = $options->{message};
-    my $type = $options->{type} || '';
-    if ($message) {
-        # multipart send using plain text and html
-        if ($type eq 'multi') {
-            die 'message param must be a hashref if type is multi'
-                unless ref $message eq 'HASH';
-            $self->html_body($message->{html}, encoding => $options->{encoding})
-                if defined $message->{html};
-            $self->text_body($message->{text}, encoding => $options->{encoding})
-                if defined $message->{text};
-        }
-        else {
-            # standard send using html or plain text
-            if ($type eq 'html') {
-                $self->html_body($options->{message}, encoding => $options->{encoding});
-            } else {
-                $self->text_body($options->{message}, encoding => $options->{encoding});
-            }
-        }
-    }
-    
-    # process additional headers
-    if ($options->{headers} && ref($options->{headers}) eq "HASH") {
-        foreach my $header (keys %{ $options->{headers} }) {
-            $self->header( $header => $options->{headers}->{$header} );
-        }
-    }
-    
-    # process attachments
-    my $files = $options->{attach};
-    if (ref $files eq 'ARRAY') {
-        map $self->attach_file($_), @$files;
-    }
+    my $params = shift || {};
+    my $conf = plugin_setting;
+    my $conf_headers = $conf->{headers} || {};
+    my %headers = ( %$conf_headers, %$params );
+    delete $headers{$_} for qw(body message async);
 
-    # okay, go team, go
-    if (defined $settings->{driver}) {
-        if (lc($settings->{driver}) eq lc("sendmail")) {
-            $self->{send_using} = ['Sendmail', $settings->{path}];
-            # failsafe
-            $Email::Send::Sendmail::SENDMAIL = $settings->{path} unless
-                $Email::Send::Sendmail::SENDMAIL;
-        }
-        if (lc($settings->{driver}) eq lc("smtp")) {
-            if ($settings->{host} && $settings->{user} && $settings->{pass}) {
-                
-                my   @parameters = ();
-                push @parameters, 'Host' => $settings->{host} if $settings->{host};
-                push @parameters, 'Port'  => $settings->{port} if $settings->{port};
-                
-                push @parameters, 'username' => $settings->{user} if $settings->{user};
-                push @parameters, 'password' => $settings->{pass} if $settings->{pass};
-                push @parameters, 'ssl'      => $settings->{ssl} if $settings->{ssl};
-                
-                push @parameters, 'Proto' => 'tcp';
-                push @parameters, 'Reuse' => 1;
-                
-                push @parameters, 'Debug' => 1 if $settings->{debug};
-                
-                $self->{send_using} = ['SMTP', @parameters];
-            }
-            else {
-                $self->{send_using} = ['SMTP', Host => $settings->{host}];
-            }
-        }
-        if (lc($settings->{driver}) eq lc("qmail")) {
-            $self->{send_using} = ['Qmail', $settings->{path}];
-            # fail safe
-            $Email::Send::Qmail::QMAIL = $settings->{path} unless
-                $Email::Send::Qmail::QMAIL;
-        }
-        if (lc($settings->{driver}) eq lc("nntp")) {
-            $self->{send_using} = ['NNTP', $settings->{host}];
-        }
-        my $email = $self->email or return undef;
-        return $self->mailer->send( $email );
+    my $email = Email::Simple->create(
+        header => [ %headers ],
+        body => $params->{body} || $params->{message},
+    );
+    my $transport;
+    my $conf_transport = $conf->{transport} || {};
+    if (my ($transport_name) = keys %$conf_transport) {
+        my $transport_params = $conf_transport->{$transport_name} || {};
+        my $transport_class = "Email::Sender::Transport::$transport_name";
+        load $transport_class;
+        $transport = $transport_class->new($transport_params);
     }
-    else {
-        $self->using(@arguments) if @arguments; # Arguments passed to ->using
-        my $email = $self->email or return undef;
-        return $self->mailer->send( $email );
-    }
+    return try {
+        sendmail $email, { transport => $transport };
+    } catch {
+        my $err = $_;
+        $err = $err->message if blessed($err) and $err->can('message');
+        die $err;
+    };
 };
+
+
+register_plugin;
+
+# ABSTRACT: Simple email sending for Dancer applications
 
 =head1 SYNOPSIS
 
@@ -139,175 +48,134 @@ register email => sub {
     
     post '/contact' => sub {
         email {
-            to => '...',
-            subject => '...',
-            message => $msg,
-            attach => [ '/path/to/file' ]
+            from    => 'bob@foo.com',
+            to      => 'sue@foo.com',
+            subject => 'allo',
+            body    => 'Dear Sue, ...',
         };
     };
     
-Important Note! The default email format is plain-text, this can be changed to
-html by setting the option 'type' to 'html' in the config file or as an argument
-in the hashref passed to the email keyword. The following are options that can
-be passed to the email function:
-
-    # send message to
-    to => $email_recipient
-    
-    # send messages from
-    from => $mail_sender
-    
-    # email subject
-    subject => 'email subject line'
-    
-    # message body
-    message => 'html or plain-text data'
-    message => {
-        text => $text_message,
-        html => $html_messase,
-        # type must be 'multi'
-    }
-    
-    # email message content type
-    type => 'text'
-    type => 'html'
-    type => 'multi'
-    
-    # carbon-copy other email addresses
-    cc => 'user@site.com'
-    cc => 'user_a@site.com, user_b@site.com, user_c@site.com'
-    cc => join ', ', @email_addresses
-    
-    # blind carbon-copy other email addresses
-    bcc => 'user@site.com'
-    bcc => 'user_a@site.com, user_b@site.com, user_c@site.com'
-    bcc => join ', ', @email_addresses
-    
-    # specify where email responses should be directed
-    reply_to => 'other_email@website.com'
-    
-    # attach files to the email
-    attach => [ '/path/to/file1', '/path/to/file2' ]
-    
-    # send additional (specialized) headers
-    headers => {
-        "X-Mailer" => "Dancer::Plugin::Email 1.23456789"
-    }
-
-=head1 CODE RECIPES
-
-    # Handle Email Failures
-    
-    post '/contact' => sub {
-    
-        my $msg = email {
-            to => '...',
-            subject => '...',
-            message => $msg,
-            encoding => 'base64',
-            attach => [ '/path/to/file' ]
-        };
-        
-        warn $msg->string() if $msg->type() eq 'failure';
-        
-    };
-    
-    # Add More Email Headers
-    
-    email {
-        to => '...',
-        subject => '...',
-        message => $msg,
-        headers => {
-            "X-Mailer" => 'This fine Dancer application',
-            "X-Accept-Language" => 'en'
-        }
-    };
-    
-    # Send Text and HTML Email together
-    
-    email {
-        to => '...',
-        subject => '...',
-        type => 'multi',
-        message => {
-            text => $txt,
-            html => $html,
-        }
-    };
-    
-
-=head1 CONFIG COOKBOOK
-
-    # Send mail via SMTP with SASL authentication
-    
-    plugins:
-      Email:
-        driver: smtp
-        host: smtp.website.com
-        user: account@gmail.com
-        pass: ****
-    
-    # Send mail to/from Google (gmail)
-    
-    plugins:
-      Email:
-        ssl: 1
-        driver: smtp
-        host: smtp.gmail.com
-        port: 465
-        user: account@gmail.com
-        pass: ****
-        
-    # Send mail to/from Google (gmail) using TLS
-    
-    plugins:
-      Email:
-        tls: 1
-        driver: smtp
-        host: smtp.gmail.com
-        port: 587
-        user: account@gmail.com
-        pass: ****
-        
-    # Debug email server communications
-    
-    plugins:
-      Email:
-        debug: 1
-        
-    # Set default headers to be issued with every message
-    
-    plugins:
-      Email:
-        from: ...
-        subject: ...
-        encoding: base64
-        headers:
-          X-Mailer: MyDancer 1.0
-          X-Accept-Language: en
-
-=head1 CONFIGURATION
-
-Connection details will be taken from your Dancer application config file, and
-should be specified as, for example: 
-
-    plugins:
-      Email:
-        driver: sendmail # must be an Email::Send driver
-        path: /usr/bin/sendmail # for Sendmail
-        host: localhost # for SMTP
-        from: me@website.com
-        
 =head1 DESCRIPTION
 
-Provides an easy way of handling text or html email messages with or without
-attachments. Simply define how you wish to send the email in your application's
-YAML configuration file, then call the email keyword passing the necessary
-parameters as outlined above.
+This plugin tries to make sending emails from L<Dancer> applications as simple
+as possible.
+It uses L<Email::Sender> under the hood.
+In a lot of cases, no configuration is required.
+For example, if your app is hosted on a unix-like server with sendmail
+installed, calling C<email()> will just do the right thing.
+
+IMPORTANT: Version 1.x of this module is not backwards compatible with the
+0.x versions.
+This module was originally built on Email::Stuff which was built on
+Email::Send which has been deprecated in favor of Email::Sender.
+Versions 1.x and on have be refactored to use Email::Sender.
+I have tried to keep the interface the same as much as possible.
+The main difference is the configuration.
+If there are features missing that you were using in older versions,
+then please let me know by creating an issue on 
+L<github|https://github.com/ironcamel/Dancer-Plugin-Email>.
+
+=head1 FUNCTIONS
+
+This module by default exports the single function C<email>.
+
+=head2 email
+
+This function sends an email.
+It takes a single argument, a hashref of parameters.
+Default values for the parameters may be provided in the headers section of
+the L</CONFIGURATION>.
+Paramaters provided to this function will override the corresponding
+configuration values if there is any overlap.
+An exception is thrown if sending the email fails,
+so wrapping calls to C<email> with try/catch is recommended.
+
+    use Dancer;
+    use Dancer::Plugin::Email;
+    use Try::Tiny;
+
+    post '/contact' => sub {
+        try {
+            email {
+                from    => 'bob@foo.com',
+                to      => 'sue@foo.com',
+                subject => 'allo',
+                body    => 'Dear Sue, ...',
+                # Optional extra headers
+                headers => {
+                    "X-Mailer"          => 'This fine Dancer application',
+                    "X-Accept-Language" => 'en',
+                }
+            };
+        } catch {
+            error "Could not send email: $_";
+        };
+    };
+    
+=head1 CONFIGURATION
+
+No configuration is necessarily required.
+L<Email::Sender::Simple> tries to make a good guess about how to send the
+message.
+It will usually try to use the sendmail program on unix-like systems
+and SMTP on Windows.
+However, you may explicitly configure a transport in your configuration.
+Only one transport may be configured.
+For documentation for the parameters of the transport, see the corresponding
+Email::Sender::Transport::* module.
+For example, the parameters available for the SMTP transport are documented
+here L<Email::Sender::Transport::SMTP/ATTRIBUTES>.
+
+You may also provide default headers in the configuration:
+
+    plugins:
+      Email:
+        # Set default headers (OPTIONAL)
+        headers:
+          from: 'bob@foo.com'
+          subject: 'default subject'
+          X-Mailer: 'MyDancer 1.0'
+          X-Accept-Language: 'en'
+        # Explicity set a transport (OPTIONAL)
+        transport:
+          Sendmail:
+            sendmail: '/usr/sbin/sendmail'
+        
+Example configuration for sending mail via Gmail:
+
+    plugins:
+      Email:
+        transport:
+          SMTP:
+            ssl: 1
+            host: 'smtp.gmail.com'
+            port: 465
+            sasl_username: 'bob@gmail.com'
+            sasl_password: 'secret'
+
+Use the Sendmail transport using the sendmail program in the system path:
+
+    plugins:
+      Email:
+        transport:
+          Sendmail:
+
+Use the Sendmail transport with an explicit path to the sendmail program:
+
+    plugins:
+      Email:
+        transport:
+          Sendmail:
+            sendmail: '/usr/sbin/sendmail'
+
+=head1 SEE ALSO
+
+=over
+
+=item L<Email::Sender>
+
+=back
 
 =cut
-
-register_plugin;
 
 1;
