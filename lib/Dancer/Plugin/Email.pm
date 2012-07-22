@@ -2,10 +2,10 @@ package Dancer::Plugin::Email;
 
 use Dancer ':syntax';
 use Dancer::Plugin;
-use Email::Simple;
 use Email::Sender::Simple 'sendmail';
+use File::Type;
+use MIME::Entity;
 use Module::Load 'load';
-use Scalar::Util 'blessed';
 use Try::Tiny;
 
 register email => sub {
@@ -13,12 +13,24 @@ register email => sub {
     my $conf = plugin_setting;
     my $conf_headers = $conf->{headers} || {};
     my %headers = ( %$conf_headers, %$params );
-    delete $headers{$_} for qw(body message async);
+    my $attach = $headers{attach};
+    delete $headers{$_} for qw(body message attach);
 
-    my $email = Email::Simple->create(
-        header => [ %headers ],
-        body => $params->{body} || $params->{message},
+    my $email = MIME::Entity->build(
+        %headers,
+        Data => $params->{body} || $params->{message},
     );
+    if ($attach) {
+        my @attachments = ref($attach) eq 'ARRAY' ? @$attach : $attach;
+        for my $attachment (@attachments) {
+            $email->attach(
+                Path     => $attachment,
+                Type     => File::Type->mime_type($attachment),
+                Encoding => 'base64',
+            );
+        }
+    }
+
     my $transport;
     my $conf_transport = $conf->{transport} || {};
     if (my ($transport_name) = keys %$conf_transport) {
@@ -27,13 +39,7 @@ register email => sub {
         load $transport_class;
         $transport = $transport_class->new($transport_params);
     }
-    return try {
-        sendmail $email, { transport => $transport };
-    } catch {
-        my $err = $_;
-        $err = $err->message if blessed($err) and $err->can('message');
-        die $err;
-    };
+    return sendmail $email, { transport => $transport };
 };
 
 
@@ -52,6 +58,7 @@ register_plugin;
             to      => 'sue@foo.com',
             subject => 'allo',
             body    => 'Dear Sue, ...',
+            attach  => '/path/to/attachment',
         };
     };
     
@@ -101,6 +108,7 @@ so wrapping calls to C<email> with try/catch is recommended.
                 to      => 'sue@foo.com',
                 subject => 'allo',
                 body    => 'Dear Sue, ...',
+                attach  => ['/path/to/attachment1', '/path/to/attachment2'],
                 # Optional extra headers
                 headers => {
                     "X-Mailer"          => 'This fine Dancer application',
