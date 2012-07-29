@@ -36,8 +36,17 @@ register email => sub {
     if (my ($transport_name) = keys %$conf_transport) {
         my $transport_params = $conf_transport->{$transport_name} || {};
         my $transport_class = "Email::Sender::Transport::$transport_name";
+        my $transport_redirect = $transport_params->{redirect_address} || '';
         load $transport_class;
         $transport = $transport_class->new($transport_params);
+
+        if ($transport_redirect) {
+            $transport_class = 'Email::Sender::Transport::Redirect';
+            load $transport_class;
+            debug "Redirecting email to $transport_redirect.";
+            $transport = $transport_class->new(transport => $transport,
+                                               redirect_address => $transport_redirect);
+        }
     }
     return sendmail $email, { transport => $transport };
 };
