@@ -44,8 +44,10 @@ register email => sub {
             $transport_class = 'Email::Sender::Transport::Redirect';
             load $transport_class;
             debug "Redirecting email to $transport_redirect.";
-            $transport = $transport_class->new(transport => $transport,
-                                               redirect_address => $transport_redirect);
+            $transport = $transport_class->new(
+                transport        => $transport,
+                redirect_address => $transport_redirect
+            );
         }
     }
     return sendmail $email, { transport => $transport };
