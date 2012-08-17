@@ -14,12 +14,52 @@ register email => sub {
     my $conf_headers = $conf->{headers} || {};
     my %headers = ( %$conf_headers, %$params );
     my $attach = $headers{attach};
-    delete $headers{$_} for qw(body message attach);
+    my $email;
 
-    my $email = MIME::Entity->build(
-        %headers,
-        Data => $params->{body} || $params->{message},
-    );
+    delete $headers{$_} for qw(body message attach type);
+    $params->{type} ||= 'plain';
+
+    # process message
+    if (lc($params->{type}) eq 'multi') {
+        # multipart send using plain text and html
+        $email = MIME::Entity->build(%headers,
+                                     Type => 'multipart/alternative',
+                                     );
+
+        if (ref($params->{message}) eq 'HASH') {
+            $email->attach(Type => 'text/html',
+                           Charset => 'utf-8',
+                           Encoding => 'quoted-printable',
+                           Data => $params->{message}->{html})
+                if defined $params->{message}->{html};
+            $email->attach(Type => 'text/plain',
+                           Charset => 'utf-8',
+                           Encoding => 'quoted-printable',
+                           Data => $params->{message}->{text})
+                if defined $params->{message}->{text};
+        }
+    }
+    else {
+        # standard send using html or plain text
+        if (lc($params->{type}) eq 'html') {
+            $email = MIME::Entity->build(%headers,
+                                         Type => 'text/html',
+                                         Charset => 'utf-8',
+                                         Encoding => 'quoted-printable',
+                                         Data => $params->{message},
+                                        );
+        }
+        else {
+            $email = MIME::Entity->build(%headers,
+                                         Type => 'text/plain',
+                                         Charset => 'utf-8',
+                                         Encoding => 'quoted-printable',
+                                         Format => 'flowed',
+                                         Data => $params->{message},
+                                        );
+        }
+    }
+
     if ($attach) {
         my @attachments = ref($attach) eq 'ARRAY' ? @$attach : $attach;
         for my $attachment (@attachments) {
