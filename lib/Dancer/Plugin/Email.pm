@@ -10,14 +10,22 @@ use Try::Tiny;
 
 register email => sub {
     my $params = shift || {};
+    my $extra_headers = delete($params->{headers}) || {};
     my $conf = plugin_setting;
     my $conf_headers = $conf->{headers} || {};
-    my %headers = ( %$conf_headers, %$params );
+    my %headers = ( %$conf_headers, %$params, %$extra_headers );
     my $attach = $headers{attach};
-    delete $headers{$_} for qw(body message attach);
+    if (my $type = $headers{type}) {
+        $headers{Type} = $type eq 'html' ? 'text/html' : 'text/plain';
+    }
+    $headers{Type}   ||= 'text/plain';
+    $headers{Format} ||= 'flowed' if $headers{Type} eq 'text/plain';
+    delete $headers{$_} for qw(body message attach type);
 
     my $email = MIME::Entity->build(
-        %headers,
+        Charset  => 'utf-8',
+        Encoding => 'quoted-printable',
+        %headers, # %headers may overwrite type, charset, and encoding
         Data => $params->{body} || $params->{message},
     );
     if ($attach) {
@@ -116,10 +124,11 @@ so wrapping calls to C<email> with try/catch is recommended.
         try {
             email {
                 from    => 'bob@foo.com',
-                to      => 'sue@foo.com',
+                to      => 'sue@foo.com, jane@foo.com',
                 subject => 'allo',
                 body    => 'Dear Sue, ...',
                 attach  => ['/path/to/attachment1', '/path/to/attachment2'],
+                type    => 'html', # can be 'html' or 'plain'
                 # Optional extra headers
                 headers => {
                     "X-Mailer"          => 'This fine Dancer application',
