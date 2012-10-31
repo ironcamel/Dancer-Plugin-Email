@@ -9,9 +9,12 @@ use Module::Load 'load';
 use Try::Tiny;
 
 register email => sub {
-    my $params = shift || {};
+    my ($dsl, $params) = plugin_args(@_);
+    $params ||= {};
+
     my $extra_headers = delete($params->{headers}) || {};
     my $conf = plugin_setting;
+
     my $conf_headers = $conf->{headers} || {};
     my %headers = ( %$conf_headers, %$params, %$extra_headers );
     my $attach = $headers{attach};
@@ -62,7 +65,7 @@ register email => sub {
 };
 
 
-register_plugin;
+register_plugin for_versions => [1, 2];
 
 # ABSTRACT: Simple email sending for Dancer applications
 
@@ -195,6 +198,10 @@ Use the Sendmail transport with an explicit path to the sendmail program:
         transport:
           Sendmail:
             sendmail: '/usr/sbin/sendmail'
+
+=head1 COMPATIBILITY
+
+This plugin is compatible with both Dancer 1 and 2.
 
 =head1 SEE ALSO
 
