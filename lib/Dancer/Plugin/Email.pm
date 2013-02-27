@@ -31,11 +31,26 @@ register email => sub {
     if ($attach) {
         my @attachments = ref($attach) eq 'ARRAY' ? @$attach : $attach;
         for my $attachment (@attachments) {
-            $email->attach(
-                Path     => $attachment,
-                Type     => File::Type->mime_type($attachment),
-                Encoding => 'base64',
-            );
+            my %mime;
+            # if it's an hash, we pass it verbatim to the
+            # MIME::Entity builder
+            if (ref($attachment) eq 'HASH') {
+                %mime = %$attachment;
+                unless ($mime{Path}) {
+                    warning "No Path provided for this attachment!";
+                    next;
+                };
+                $mime{Encoding} ||= 'base64';
+                $mime{Type} ||= File::Type->mime_type($mime{Path}),
+            } else {
+                %mime = (
+                         Path     => $attachment,
+                         Type     => File::Type->mime_type($attachment),
+                         Encoding => 'base64',
+                        );
+            }
+            # debug to_dumper(\%mime);
+            $email->attach(%mime);
         }
     }
 
@@ -126,8 +141,16 @@ so wrapping calls to C<email> with try/catch is recommended.
                 from    => 'bob@foo.com',
                 to      => 'sue@foo.com, jane@foo.com',
                 subject => 'allo',
-                body    => 'Dear Sue, ...',
-                attach  => ['/path/to/attachment1', '/path/to/attachment2'],
+                body    => 'Dear Sue, ...<img src="cid:blabla">',
+                attach  => ['/path/to/attachment1',
+                            '/path/to/attachment2',
+                            {
+                             Path => "attachment3",
+                             # Path is required when passing a hashref
+                             # for other optional values, see Mime::Entity
+                             Id => "blabla",
+                            }
+                           ],
                 type    => 'html', # can be 'html' or 'plain'
                 # Optional extra headers
                 headers => {
