@@ -32,8 +32,6 @@ register email => sub {
         my @attachments = ref($attach) eq 'ARRAY' ? @$attach : $attach;
         for my $attachment (@attachments) {
             my %mime;
-            # if it's an hash, we pass it verbatim to the
-            # MIME::Entity builder
             if (ref($attachment) eq 'HASH') {
                 %mime = %$attachment;
                 unless ($mime{Path}) {
@@ -44,12 +42,11 @@ register email => sub {
                 $mime{Type} ||= File::Type->mime_type($mime{Path}),
             } else {
                 %mime = (
-                         Path     => $attachment,
-                         Type     => File::Type->mime_type($attachment),
-                         Encoding => 'base64',
-                        );
+                    Path     => $attachment,
+                    Type     => File::Type->mime_type($attachment),
+                    Encoding => 'base64',
+                );
             }
-            # debug to_dumper(\%mime);
             $email->attach(%mime);
         }
     }
@@ -59,7 +56,7 @@ register email => sub {
     if (my ($transport_name) = keys %$conf_transport) {
         my $transport_params = $conf_transport->{$transport_name} || {};
         my $transport_class = "Email::Sender::Transport::$transport_name";
-        my $transport_redirect = $transport_params->{redirect_address} || '';
+        my $transport_redirect = $transport_params->{redirect_address};
         load $transport_class;
         $transport = $transport_class->new($transport_params);
 
@@ -142,15 +139,16 @@ so wrapping calls to C<email> with try/catch is recommended.
                 to      => 'sue@foo.com, jane@foo.com',
                 subject => 'allo',
                 body    => 'Dear Sue, ...<img src="cid:blabla">',
-                attach  => ['/path/to/attachment1',
-                            '/path/to/attachment2',
-                            {
-                             Path => "attachment3",
-                             # Path is required when passing a hashref
-                             # for other optional values, see Mime::Entity
-                             Id => "blabla",
-                            }
-                           ],
+                attach  => [
+                    '/path/to/attachment1',
+                    '/path/to/attachment2',
+                    {
+                        Path => "/path/to/attachment3",
+                        # Path is required when passing a hashref.
+                        # See Mime::Entity for other optional values.
+                        Id => "blabla",
+                    }
+                ],
                 type    => 'html', # can be 'html' or 'plain'
                 # Optional extra headers
                 headers => {
@@ -219,11 +217,31 @@ Use the Sendmail transport with an explicit path to the sendmail program:
           Sendmail:
             sendmail: '/usr/sbin/sendmail'
 
+=head1 CONTRIBUTORS
+
+=over
+
+=item *
+
+Marco Pessotto <melmothx@gmail.com>
+
+=item *
+
+Oleg A. Mamontov <oleg@mamontov.net>
+
+=item *
+
+Stefan Hornburg <racke@linuxia.de>
+
+=back
+
 =head1 SEE ALSO
 
 =over
 
 =item L<Email::Sender>
+
+=item L<MIME::Entity>
 
 =back
 

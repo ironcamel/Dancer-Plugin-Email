@@ -8,7 +8,7 @@ Simple email sending for Dancer applications
 
 # Documentation
 
-See [Dancer::Plugin::Email](https://github.com/ironcamel/Dancer-Plugin-Email).
+See [Dancer::Plugin::Email](https://metacpan.org/module/Dancer::Plugin::Email).
 After installation, you can view the documentation by running
 `man Dancer::Plugin::Email` or `perldoc Dancer::Plugin::Email`.
 
