@@ -3,6 +3,7 @@ package Dancer::Plugin::Email;
 use Dancer ':syntax';
 use Dancer::Plugin;
 use Email::Sender::Simple 'sendmail';
+use Email::Date::Format 'email_date';
 use File::Type;
 use MIME::Entity;
 use Module::Load 'load';
@@ -20,6 +21,7 @@ register email => sub {
     }
     $headers{Type}   ||= 'text/plain';
     $headers{Format} ||= 'flowed' if $headers{Type} eq 'text/plain';
+    $headers{Date}   ||= email_date();
     delete $headers{$_} for qw(body message attach type);
 
     my $email = MIME::Entity->build(
