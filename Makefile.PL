@@ -23,6 +23,7 @@ my %WriteMakefileArgs = (
     "Dancer" => 0,
     "Dancer::Plugin" => 0,
     "Email::Sender::Simple" => 0,
+    "Email::Date::Format" => 0,
     "File::Type" => 0,
     "MIME::Entity" => 0,
     "Module::Load" => 0,
