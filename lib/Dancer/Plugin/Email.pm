@@ -1,6 +1,6 @@
 package Dancer::Plugin::Email;
 
-use Dancer qw(:syntax !load);
+use Dancer qw(:syntax debug warning);
 use Dancer::Plugin;
 use Email::Sender::Simple 'sendmail';
 use Email::Date::Format 'email_date';
