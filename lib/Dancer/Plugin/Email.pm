@@ -7,7 +7,6 @@ use Email::Date::Format 'email_date';
 use File::Type;
 use MIME::Entity;
 use Module::Load 'load';
-use Try::Tiny;
 
 register email => sub {
     my $params = shift || {};
@@ -230,6 +229,10 @@ Marco Pessotto <melmothx@gmail.com>
 =item *
 
 Oleg A. Mamontov <oleg@mamontov.net>
+
+=item *
+
+Rusty Conover <https://github.com/rustyconover>
 
 =item *
 
