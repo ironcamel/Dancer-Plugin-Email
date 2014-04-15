@@ -21,6 +21,7 @@ register email => sub {
     $headers{Type}   ||= 'text/plain';
     $headers{Format} ||= 'flowed' if $headers{Type} eq 'text/plain';
     $headers{Date}   ||= email_date();
+    my $multipart = delete $headers{multipart};
     delete $headers{$_} for qw(body message attach type);
 
     my $email = MIME::Entity->build(
@@ -30,6 +31,9 @@ register email => sub {
         Data => $params->{body} || $params->{message},
     );
     if ($attach) {
+        if ($multipart) {
+            $email->make_multipart($multipart);
+        }
         my @attachments = ref($attach) eq 'ARRAY' ? @$attach : $attach;
         for my $attachment (@attachments) {
             my %mime;
