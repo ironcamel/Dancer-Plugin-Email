@@ -10,6 +10,7 @@ use Module::Load 'load';
 
 register email => sub {
     my $params = shift || {};
+    my $multipart = delete $params->{multipart};
     my $extra_headers = delete($params->{headers}) || {};
     my $conf = plugin_setting;
     my $conf_headers = $conf->{headers} || {};
@@ -21,7 +22,6 @@ register email => sub {
     $headers{Type}   ||= 'text/plain';
     $headers{Format} ||= 'flowed' if $headers{Type} eq 'text/plain';
     $headers{Date}   ||= email_date();
-    my $multipart = delete $headers{multipart};
     delete $headers{$_} for qw(body message attach type);
 
     my $email = MIME::Entity->build(
@@ -32,6 +32,11 @@ register email => sub {
     );
     if ($attach) {
         if ($multipart) {
+            # by default, when you add an attachment,
+            # C<make_multipart> will be called by MIME::Entity, but
+            # defaults to 'mixed'. Thunderbird doesn't like this for
+            # embedded images, so we have a chance to set it to
+            # 'related' or anything that the user wants
             $email->make_multipart($multipart);
         }
         my @attachments = ref($attach) eq 'ARRAY' ? @$attach : $attach;
@@ -144,6 +149,7 @@ so wrapping calls to C<email> with try/catch is recommended.
                 to      => 'sue@foo.com, jane@foo.com',
                 subject => 'allo',
                 body    => 'Dear Sue, ...<img src="cid:blabla">',
+                multipart => 'related', # optional, see below
                 attach  => [
                     '/path/to/attachment1',
                     '/path/to/attachment2',
@@ -221,6 +227,34 @@ Use the Sendmail transport with an explicit path to the sendmail program:
         transport:
           Sendmail:
             sendmail: '/usr/sbin/sendmail'
+
+=head2 Multipart messages
+
+You can embed images in HTML messages this way: first, set the C<type>
+to C<html>. Then pass the attachments as hashrefs, setting C<Path> and
+C<Id>. In the HTML body, refer to the attachment using the C<Id>,
+prepending C<cid:> in the C<src> attribute. This works for popular
+webmail clients like Gmail and OE, but is not enough for Thunderbird,
+which wants a C<multipart/related> mail, not the default
+C<multipart/mixed>. You can fix this adding the C<multipart> parameter
+set to C<related>, which set the desired subtype when you pass
+attachments.
+
+Example:
+
+  email {
+         from    => $from,
+         to      => $to,
+         subject => $subject,
+         body    => q{<p>Image embedded: <img src="cid:mycid"/></p>},
+         type    => 'html',
+         attach  => [ { Id => 'mycid', Path => '/path/to/file' }],
+         multipart => 'related'
+        };
+
+
+
+
 
 =head1 CONTRIBUTORS
 
