@@ -16,6 +16,7 @@ register email => sub {
     my $conf_headers = $conf->{headers} || {};
     my %headers = ( %$conf_headers, %$params, %$extra_headers );
     my $attach = $headers{attach};
+    my $sender = delete $headers{sender};
     if (my $type = $headers{type}) {
         $headers{Type} = $type eq 'html' ? 'text/html' : 'text/plain';
     }
@@ -80,7 +81,9 @@ register email => sub {
             );
         }
     }
-    return sendmail $email, { transport => $transport };
+    my %sendmail_arg = ( transport => $transport );
+    $sendmail_arg{from} = $sender if defined $sender;
+    return sendmail $email, \%sendmail_arg;
 };
 
 
@@ -145,6 +148,7 @@ so wrapping calls to C<email> with try/catch is recommended.
     post '/contact' => sub {
         try {
             email {
+                sender  => 'bounces-here@foo.com', # optional
                 from    => 'bob@foo.com',
                 to      => 'sue@foo.com, jane@foo.com',
                 subject => 'allo',
@@ -192,6 +196,7 @@ You may also provide default headers in the configuration:
       Email:
         # Set default headers (OPTIONAL)
         headers:
+          sender: 'bounces-here@foo.com'
           from: 'bob@foo.com'
           subject: 'default subject'
           X-Mailer: 'MyDancer 1.0'
