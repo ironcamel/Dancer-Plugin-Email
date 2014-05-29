@@ -1,5 +1,7 @@
 package Dancer::Plugin::Email;
 
+# VERSION
+
 use Dancer qw(:syntax debug warning);
 use Dancer::Plugin;
 use Email::Sender::Simple 'sendmail';
