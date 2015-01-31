@@ -30,7 +30,7 @@ register email => sub {
     my $email = MIME::Entity->build(
         Charset  => 'utf-8',
         Encoding => 'quoted-printable',
-        %headers, # %headers may overwrite type, charset, and encoding
+        %headers,
         Data => $params->{body} || $params->{message},
     );
     if ($attach) {
@@ -85,6 +85,10 @@ register email => sub {
     }
     my %sendmail_arg = ( transport => $transport );
     $sendmail_arg{from} = $sender if defined $sender;
+    if ( $headers{bcc} ) {
+        sendmail $email, { %sendmail_arg, to => $headers{bcc} };
+        $email->head->delete('bcc');
+    }
     return sendmail $email, \%sendmail_arg;
 };
 
@@ -153,6 +157,7 @@ so wrapping calls to C<email> with try/catch is recommended.
                 sender  => 'bounces-here@foo.com', # optional
                 from    => 'bob@foo.com',
                 to      => 'sue@foo.com, jane@foo.com',
+                bcc     => 'sam@foo.com',
                 subject => 'allo',
                 body    => 'Dear Sue, ...<img src="cid:blabla">',
                 multipart => 'related', # optional, see below
