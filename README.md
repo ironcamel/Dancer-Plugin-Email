@@ -4,14 +4,13 @@ Dancer::Plugin::Email - Simple email sending for Dancer applications
 
 # VERSION
 
-version 1.0101
+version 1.0300
 
 # SYNOPSIS
 
     use Dancer;
     use Dancer::Plugin::Email;
     
-
     post '/contact' => sub {
         email {
             from    => 'bob@foo.com',
@@ -24,9 +23,9 @@ version 1.0101
 
 # DESCRIPTION
 
-This plugin tries to make sending emails from [Dancer](http://search.cpan.org/perldoc?Dancer) applications as simple
+This plugin tries to make sending emails from [Dancer](https://metacpan.org/pod/Dancer) applications as simple
 as possible.
-It uses [Email::Sender](http://search.cpan.org/perldoc?Email::Sender) under the hood.
+It uses [Email::Sender](https://metacpan.org/pod/Email::Sender) under the hood.
 In a lot of cases, no configuration is required.
 For example, if your app is hosted on a unix-like server with sendmail
 installed, calling `email()` will just do the right thing.
@@ -51,7 +50,7 @@ This module by default exports the single function `email`.
 This function sends an email.
 It takes a single argument, a hashref of parameters.
 Default values for the parameters may be provided in the headers section of
-the ["CONFIGURATION"](#CONFIGURATION).
+the ["CONFIGURATION"](#configuration).
 Paramaters provided to this function will override the corresponding
 configuration values if there is any overlap.
 An exception is thrown if sending the email fails,
@@ -64,10 +63,13 @@ so wrapping calls to `email` with try/catch is recommended.
     post '/contact' => sub {
         try {
             email {
+                sender  => 'bounces-here@foo.com', # optional
                 from    => 'bob@foo.com',
                 to      => 'sue@foo.com, jane@foo.com',
+                bcc     => 'sam@foo.com',
                 subject => 'allo',
                 body    => 'Dear Sue, ...<img src="cid:blabla">',
+                multipart => 'related', # optional, see below
                 attach  => [
                     '/path/to/attachment1',
                     '/path/to/attachment2',
@@ -93,7 +95,7 @@ so wrapping calls to `email` with try/catch is recommended.
 # CONFIGURATION
 
 No configuration is necessarily required.
-[Email::Sender::Simple](http://search.cpan.org/perldoc?Email::Sender::Simple) tries to make a good guess about how to send the
+[Email::Sender::Simple](https://metacpan.org/pod/Email::Sender::Simple) tries to make a good guess about how to send the
 message.
 It will usually try to use the sendmail program on unix-like systems
 and SMTP on Windows.
@@ -102,7 +104,7 @@ Only one transport may be configured.
 For documentation for the parameters of the transport, see the corresponding
 Email::Sender::Transport::\* module.
 For example, the parameters available for the SMTP transport are documented
-here ["ATTRIBUTES" in Email::Sender::Transport::SMTP](http://search.cpan.org/perldoc?Email::Sender::Transport::SMTP#ATTRIBUTES).
+here ["ATTRIBUTES" in Email::Sender::Transport::SMTP](https://metacpan.org/pod/Email::Sender::Transport::SMTP#ATTRIBUTES).
 
 You may also provide default headers in the configuration:
 
@@ -110,6 +112,7 @@ You may also provide default headers in the configuration:
       Email:
         # Set default headers (OPTIONAL)
         headers:
+          sender: 'bounces-here@foo.com'
           from: 'bob@foo.com'
           subject: 'default subject'
           X-Mailer: 'MyDancer 1.0'
@@ -146,6 +149,30 @@ Use the Sendmail transport with an explicit path to the sendmail program:
           Sendmail:
             sendmail: '/usr/sbin/sendmail'
 
+## Multipart messages
+
+You can embed images in HTML messages this way: first, set the `type`
+to `html`. Then pass the attachments as hashrefs, setting `Path` and
+`Id`. In the HTML body, refer to the attachment using the `Id`,
+prepending `cid:` in the `src` attribute. This works for popular
+webmail clients like Gmail and OE, but is not enough for Thunderbird,
+which wants a `multipart/related` mail, not the default
+`multipart/mixed`. You can fix this adding the `multipart` parameter
+set to `related`, which set the desired subtype when you pass
+attachments.
+
+Example:
+
+    email {
+           from    => $from,
+           to      => $to,
+           subject => $subject,
+           body    => q{<p>Image embedded: <img src="cid:mycid"/></p>},
+           type    => 'html',
+           attach  => [ { Id => 'mycid', Path => '/path/to/file' }],
+           multipart => 'related'
+          };
+
 # CONTRIBUTORS
 
 - Marco Pessotto <melmothx@gmail.com>
@@ -155,8 +182,8 @@ Use the Sendmail transport with an explicit path to the sendmail program:
 
 # SEE ALSO
 
-- [Email::Sender](http://search.cpan.org/perldoc?Email::Sender)
-- [MIME::Entity](http://search.cpan.org/perldoc?MIME::Entity)
+- [Email::Sender](https://metacpan.org/pod/Email::Sender)
+- [MIME::Entity](https://metacpan.org/pod/MIME::Entity)
 
 # AUTHORS
 
