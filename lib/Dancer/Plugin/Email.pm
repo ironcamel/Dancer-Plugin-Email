@@ -47,12 +47,14 @@ register email => sub {
             my %mime;
             if (ref($attachment) eq 'HASH') {
                 %mime = %$attachment;
-                unless ($mime{Path}) {
-                    warning "No Path provided for this attachment!";
+                unless ($mime{Path} || $mime{Data}) {
+                    warning "No Path or Data provided for this attachment!";
                     next;
                 };
-                $mime{Encoding} ||= 'base64';
-                $mime{Type} ||= File::Type->mime_type($mime{Path}),
+                if ($mime{Path}) {
+                    $mime{Encoding} ||= 'base64';
+                    $mime{Type} ||= File::Type->mime_type($mime{Path});
+                }
             } else {
                 %mime = (
                     Path     => $attachment,
@@ -265,8 +267,10 @@ Example:
         };
 
 
-
-
+The C<attach> value accepts either a single attachment or an arrayref
+of attachment. Each attachment may be a scalar, with the path of the
+file to attach, or an hashref, in which case the hashref is passed to
+the L<Mime::Entity>'s C<attach> method.
 
 =head1 CONTRIBUTORS
 
