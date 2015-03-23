@@ -4,7 +4,7 @@ Dancer::Plugin::Email - Simple email sending for Dancer applications
 
 # VERSION
 
-version 1.0300
+version 1.0400
 
 # SYNOPSIS
 
@@ -172,6 +172,11 @@ Example:
            attach  => [ { Id => 'mycid', Path => '/path/to/file' }],
            multipart => 'related'
           };
+
+The `attach` value accepts either a single attachment or an arrayref
+of attachment. Each attachment may be a scalar, with the path of the
+file to attach, or an hashref, in which case the hashref is passed to
+the [Mime::Entity](https://metacpan.org/pod/Mime::Entity)'s `attach` method.
 
 # CONTRIBUTORS
 
